@@ -5,8 +5,8 @@ account: osorensen
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 730941
-bundleId: 1900845
+bundleId: 1919698
 url: https://osorensen.shinyapps.io/shiny_asymm/
-when: 1551193284.41088
+when: 1551878446.2079
 asMultiple: FALSE
 asStatic: FALSE
