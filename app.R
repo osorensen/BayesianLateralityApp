@@ -19,19 +19,23 @@ ui <- fluidPage(
      
   sidebarPanel(
     HTML("<h3>Parameters</h3>"),
-    sliderInput("theta",
-                "Prior probability of right hemispheric dominance (theta):",
-                min = 0,
-                max = 1,
-                value = 0.05),
+  
     
     sliderInput("rho0",
-                "Probability of right-handedness given left hemispheric dominance (rho0):",
-                min = 0, max = 1, value = 0.56),
+                "Probability of right hemispheric dominance given adextrality (rho0):",
+                min = 0, max = 1, value = 0.31),
     
     sliderInput("rho1",
-                "Probability of right-handedness given right hemispheric dominance (rho1):",
-                min = 0, max = 1, value = 0.27)
+                "Probability of right hemispheric dominance given dextrality (rho1):",
+                min = 0, max = 1, value = 0.115),
+    
+    textInput("mu",
+              "Means (mu00, mu01, mu10, mu11):",
+              value = "10.43, -24.41, 11.52, -24.41"),
+    
+    textInput("sd",
+              "Standard deviations (sigma00, sigma01, sigma10, sigma11):",
+              value = "22.8, 28, 17, 28")
   ),
      
     
@@ -48,7 +52,7 @@ ui <- fluidPage(
   
     sidebarPanel(
       textInput("handedness",
-                "Handedness (A/L or D/R, comma separated)",
+                "Handedness A or D:",
                 value = "D"),
       
       textInput("listening",
@@ -70,14 +74,17 @@ ui <- fluidPage(
 # Define server logic required to draw a histogram
 server <- function(input, output) {
   
+  
    output$distPlot <- renderPlot({
      
      data <- expand.grid(listening = seq(from = -100, to = 100, by = 1), handedness = c("A", "D"), 
                          stringsAsFactors = FALSE)
      
      
+     
      as_tibble(predict_asymmetry(data, 
-                                 theta = input$theta,
+                                 mu = as.numeric(unlist(strsplit(input$mu, split = ","))),
+                                 sigma = as.numeric(unlist(strsplit(input$sd, split = ","))),
                                  rho = c(input$rho0, input$rho1) )) %>% 
        bind_cols(as_tibble(data)) %>% 
        mutate(handedness = if_else(handedness == "A", "Adextral", "Dextral")) %>% 
@@ -93,8 +100,9 @@ server <- function(input, output) {
    output$probTab <- renderTable({
      tibble(ID = 1,
             listening = as.integer(unlist(strsplit(input$listening, split = ","))),
-            handedness = unlist(strsplit(input$handedness, split = ","))) %>% 
-       predict_asymmetry(theta = input$theta,
+            handedness = input$handedness) %>% 
+       predict_asymmetry(mu = as.numeric(unlist(strsplit(input$mu, split = ","))),
+                         sigma = as.numeric(unlist(strsplit(input$sd, split = ","))),
                          rho = c(input$rho0, input$rho1) ) %>%
        select(-ID) %>% 
        rename(`P(Left Dominance)` = LeftDominance,
