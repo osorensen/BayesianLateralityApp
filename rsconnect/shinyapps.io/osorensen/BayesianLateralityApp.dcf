@@ -1,0 +1,12 @@
+name: BayesianLateralityApp
+title: BayesianLateralityApp
+username:
+account: osorensen
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 1878139
+bundleId: 2837134
+url: https://osorensen.shinyapps.io/BayesianLateralityApp/
+when: 1582894055.56787
+asMultiple: FALSE
+asStatic: FALSE

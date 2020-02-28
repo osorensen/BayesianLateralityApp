@@ -8,7 +8,7 @@
 #
 
 library(shiny)
-library(asymm)
+library(BayesianLaterality)
 library(ggplot2)
 library(dplyr)
 library(tidyr)
@@ -20,26 +20,36 @@ ui <- fluidPage(
   sidebarPanel(
     HTML("<h3>Parameters</h3>"),
   
+    sliderInput("prob0",
+                "Probability of left dominance for right-handers:",
+                min = 0, max = 1, value = 0.87),    
     
-    sliderInput("rho0",
-                "Probability of right hemispheric dominance given adextrality (rho0):",
+    sliderInput("prob1",
+                "Probability of left dominance for left-handers:",
                 min = 0, max = 1, value = 0.31),
     
-    sliderInput("rho1",
-                "Probability of right hemispheric dominance given dextrality (rho1):",
-                min = 0, max = 1, value = 0.115),
+
     
-    textInput("mu",
-              "Means (mu00, mu01, mu10, mu11):",
-              value = "10, -24, 12, -24"),
+    textInput("mu_right_handers",
+              "Mean laterality for right-handers with left and non-left dominance:",
+              value = "12, -24"),
     
-    textInput("sd",
-              "Standard deviations (sigma00, sigma01, sigma10, sigma11):",
-              value = "22, 22, 22, 22"),
+    textInput("sd_right_handers",
+              "Standard deviations of laterality for right-handers with left and non-left dominance:",
+              value = "17, 17"),
     
-    textInput("mu_sem",
-              "Optional standard error of means, e.g., '4.6, 7.0, 4.3, 7.0':",
-              value = "")
+    textInput("mu_left_handers",
+              "Mean laterality for left-handers with left and non-left dominance:",
+              value = "10, -24"),
+    
+    textInput("sd_left_handers",
+              "Standard deviations of laterality for left-handers with left and non-left dominance:",
+              value = "24.9, 24.9"),
+    
+    
+    sliderInput("icc",
+                "Correlation between repeated measurements on the same subject:",
+                min = 0, max = 1, value = 0.7)   
   ),
      
     
@@ -49,19 +59,25 @@ ui <- fluidPage(
    mainPanel(
      HTML("<h3>Visualization of Distributions</h3>"),
      plotOutput("distPlot"),
+     HTML("<br><br>"),
      
      HTML("<h3>Compute probabilities</h3>"),
-     HTML("Provide one or more measurements on a given subject."),
+     HTML(paste("Provide one or more measurements on a given subject, and specify the handedness of the subject.",
+          "The table below states shows the probability of left and non-left hemispheric dominance for the subject,",
+          "and the parameters specified in the left side of this page are used.<br><br>")),
      
   
     sidebarPanel(
-      textInput("handedness",
-                "Handedness A or D:",
-                value = "D"),
+      radioButtons("handedness",
+                   "Handedness:",
+                   choices = list("left", "right")),
       
-      textInput("listening",
-                "Listening (between -100 and 100, comma separated)",
+      textInput("laterality",
+                "Observed laterality (between -100 and 100, comma separated)",
                 value = "-10, 0, 10")
+      
+
+      
     ),
     mainPanel(
          tableOutput("probTab")
@@ -78,45 +94,77 @@ ui <- fluidPage(
 # Define server logic required to draw a histogram
 server <- function(input, output) {
   
+
+
+  
+ 
   
    output$distPlot <- renderPlot({
      
-     data <- expand.grid(listening = seq(from = -100, to = 100, by = 1), handedness = c("A", "D"), 
-                         stringsAsFactors = FALSE) %>% 
+     data <- crossing(listening = seq(from = -100, to = 100, by = 3), handedness = c("left", "right")) %>% 
        mutate(ID = row_number())
      
+     mu_left_handers <- do.call(as.numeric, strsplit(input$mu_left_handers, split = ","))
+     mu_right_handers <- do.call(as.numeric, strsplit(input$mu_right_handers, split = ","))
+     sd_left_handers <- do.call(as.numeric, strsplit(input$sd_left_handers, split = ","))
+     sd_right_handers <- do.call(as.numeric, strsplit(input$sd_right_handers, split = ","))
      
-     as_tibble(predict_asymmetry(data, 
-                                 mu = as.numeric(unlist(strsplit(input$mu, split = ","))),
-                                 sigma = as.numeric(unlist(strsplit(input$sd, split = ","))),
-                                 rho = c(input$rho0, input$rho1),
-                                 mu_sem = if(input$mu_sem == "") NULL else as.numeric(unlist(strsplit(input$mu_sem, split = ",")))
-                                 )) %>% 
-       bind_cols(as_tibble(data)) %>% 
-       mutate(
-         handedness = if_else(handedness == "A", "Adextral", "Dextral")
-         ) %>% 
-       ggplot(aes(x = listening, y = LeftDominance, group = handedness, color = handedness)) +
+     
+     parameters <- tibble(
+       dominance = rep(c("left", "right", "none"), each = 2),
+       handedness = rep(c("left", "right"), 3),
+       mean_li = c(mu_left_handers[[1]], mu_right_handers[[1]],
+                   mu_left_handers[[2]], mu_right_handers[[2]],
+                   0, 0),
+       sd_li = c(sd_left_handers[[1]], sd_right_handers[[1]],
+                 sd_left_handers[[2]], sd_right_handers[[2]],
+                 22, 22),
+       prob_dominance = c(input$prob1, input$prob0, 1 - input$prob1, 1 - input$prob0, 0, 0)
+     )
+     
+     predict_dominance(data, parameters = parameters) %>% 
+       filter(dominance == "left") %>% 
+       inner_join(data, by = c("ID", "handedness")) %>% 
+       rename(Handedness = handedness) %>% 
+       ggplot(aes(x = listening, y = probability, group = Handedness, color = Handedness)) +
        geom_line() +
-       ylab("") +
-       xlab("Dichotic Listening Score") +
-       ggtitle("Posterior Probability of Left Hemispheric Dominance") +
-       theme(legend.title = element_blank(), text = element_text(size = 18))
+       ylab("Probability of left hemispheric dominance") +
+       xlab("Laterality measurement") +
+       theme(text = element_text(size = 18))
       
    })
    
+
    output$probTab <- renderTable({
+     
+     mu_left_handers <- do.call(as.numeric, strsplit(input$mu_left_handers, split = ","))
+     mu_right_handers <- do.call(as.numeric, strsplit(input$mu_right_handers, split = ","))
+     sd_left_handers <- do.call(as.numeric, strsplit(input$sd_left_handers, split = ","))
+     sd_right_handers <- do.call(as.numeric, strsplit(input$sd_right_handers, split = ","))
+     
+     
+     parameters <- tibble(
+       dominance = rep(c("left", "right", "none"), each = 2),
+       handedness = rep(c("left", "right"), 3),
+       mean_li = c(mu_left_handers[[1]], mu_right_handers[[1]],
+                   mu_left_handers[[2]], mu_right_handers[[2]],
+                   0, 0),
+       sd_li = c(sd_left_handers[[1]], sd_right_handers[[1]],
+                 sd_left_handers[[2]], sd_right_handers[[2]],
+                 22, 22),
+       prob_dominance = c(input$prob1, input$prob0, 1 - input$prob1, 1 - input$prob0, 0, 0)
+     )
+     
      tibble(ID = 1,
-            listening = as.integer(unlist(strsplit(input$listening, split = ","))),
+            listening = as.numeric(unlist(strsplit(input$laterality, split = ","))),
             handedness = input$handedness) %>% 
-       predict_asymmetry(mu = as.numeric(unlist(strsplit(input$mu, split = ","))),
-                         sigma = as.numeric(unlist(strsplit(input$sd, split = ","))),
-                         rho = c(input$rho0, input$rho1),
-                         mu_sem = if(input$mu_sem == "") NULL else as.numeric(unlist(strsplit(input$mu_sem, split = ",")))) %>%
-       select(-ID) %>% 
-       rename(`P(Left Dominance)` = LeftDominance,
-              `P(Right Dominance)` = RightDominance) %>% 
-       gather()
+       predict_dominance(parameters = parameters, icc = input$icc) %>%
+       filter(dominance != "none") %>% 
+       pivot_wider(names_from = dominance, values_from = probability) %>% 
+       select(left, right) %>% 
+       rename(`P(Left dominance)` = left,
+              `P(Right dominance)` = right) %>% 
+       pivot_longer(cols = everything())
    }, colnames = FALSE)
 }
 
