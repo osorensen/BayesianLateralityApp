@@ -5,8 +5,8 @@ account: osorensen
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 1878139
-bundleId: 2837134
+bundleId: 2843026
 url: https://osorensen.shinyapps.io/BayesianLateralityApp/
-when: 1582894055.56787
+when: 1583135649.2777
 asMultiple: FALSE
 asStatic: FALSE

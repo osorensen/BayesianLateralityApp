@@ -57,7 +57,12 @@ ui <- fluidPage(
        
    # Show a plot of the generated distribution
    mainPanel(
-     HTML("<h3>Visualization of Distributions</h3>"),
+     HTML("<h2>Predict hemispheric specialisation from observed laterality</h2>"),
+     HTML(paste0("This app is intended to help readers explore the methods developed in <a href='https://doi.org/10.31234/osf.io/yvmxc'>Sørensen and Westerhausen (2020)</a>. "),
+          "The classification algorithms are implemented in the R package <a href='https://github.com/LCBC-UiO/BayesianLaterality'>BayesianLaterality</a>."),
+     
+     
+     HTML("<h3>Visualise distributions</h3>"),
      plotOutput("distPlot"),
      HTML("<br><br>"),
      
